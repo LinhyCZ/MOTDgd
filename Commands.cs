@@ -9,7 +9,6 @@ using System.Text;
 
 namespace MOTDgd
 {
-    //Nefunkční
     class CommandAd : IRocketCommand
     {
         public AllowedCaller AllowedCaller
@@ -69,15 +68,7 @@ namespace MOTDgd
 
             if (!Main.OnCooldown(player) && Main.Connected == true)
             {
-                if (true)
-                {
-                    var Configuration = new Main();
-                    UnturnedChat.Say(player, "For getting reward go to: " + Main.ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Main.Server_ID));
-                }
-                /*else
-                {
-                    UnturnedChat.Say(player, "For getting reward go to: " + Main.ShortenUrl("http://motdgd.com/motd/?user=" + "NEED_CONFIGURATION_HERE" + "&gm=unturned&clt_user=" + player.CSteamID + "&srv_id=" + Main.Server_ID));
-                }*/
+                UnturnedChat.Say(player, "For getting reward go to: " + Main.ShortenUrl("http://motdgd.com/motd/?user=" + Main.Instance.Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Main.Server_ID));
             }
             else if (Main.OnCooldown(player))
             {
@@ -150,7 +141,6 @@ namespace MOTDgd
                 return;
             }
 
-            var Configuration = new Main();
             var data = Main.CooldownTime(player);
             if (data != "")
             {
@@ -212,15 +202,12 @@ namespace MOTDgd
 
         public void Execute(IRocketPlayer caller, string[] command)
         {
-            if (caller == null || caller.HasPermission("motdgd.clearall"))
-            {
-                Main.Cooldown.Clear();
-                Logger.Log("Cooldown list cleared.");
-            }
+            Main.Cooldown.Clear();
+            Logger.Log("Cooldown list cleared.");
         }
     }
 
-    //Fix not found player
+    //Fix 
     class CommandClearCooldownPlayer : IRocketCommand
     {
         public AllowedCaller AllowedCaller
@@ -271,24 +258,25 @@ namespace MOTDgd
         public void Execute(IRocketPlayer caller, string[] command)
         {
             UnturnedPlayer player = (UnturnedPlayer)caller;
-            if (caller == null || caller.HasPermission("motdgd.clear"))
+            if (command.Length == 1)
             {
-                if (command.Length == 1)
+                UnturnedPlayer remPlayer = UnturnedPlayer.FromName(command[0]);
+                if (remPlayer != null)
                 {
-                    UnturnedPlayer remPlayer = UnturnedPlayer.FromName(command[0]);
                     Main.Cooldown.Remove(remPlayer.CSteamID);
-
+                    Logger.Log("Cleared cooldown for player " + remPlayer.DisplayName);
+                }
+                Logger.LogWarning("Tried to clear cooldown for " + command[0] + " but he is not on the server!");
+            }
+            else
+            {
+                if(caller == null)
+                {
+                    Logger.Log("Wrong syntax of command");
                 }
                 else
                 {
-                    if (caller == null)
-                    {
-                        Logger.Log("Wrong syntax of command");
-                    }
-                    else
-                    {
-                        UnturnedChat.Say(player, "Wrong syntax of command");
-                    }
+                    UnturnedChat.Say(player, "Wrong syntax of command");
                 }
             }
         }

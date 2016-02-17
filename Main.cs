@@ -23,7 +23,6 @@ namespace MOTDgd
         public bool AdvancedLogging;
         public string GiveItems;
         public int CooldownTime;
-        public bool SimulateMinecraft;
 
         public void LoadDefaults()
         {
@@ -31,7 +30,6 @@ namespace MOTDgd
             AdvancedLogging = false;
             GiveItems = "";
             CooldownTime = 15;
-            SimulateMinecraft = true;
         }
 
     }
@@ -45,9 +43,11 @@ namespace MOTDgd
         public static Dictionary<CSteamID, long> Cooldown = new Dictionary<CSteamID, long>();
         private Timer cooldownTimer;
         public static string User_ID;
+        public static Main Instance;
 
         protected override void Load()
         {
+            Instance = this;
             //Creating socket connection
             var socket = IO.Socket("http://mcnode.motdgd.com:8080");
             Logger.Log("Connecting to HUB");
@@ -73,27 +73,35 @@ namespace MOTDgd
             {
                 string resp_data = arguments + "";
                 UnturnedPlayer currentPlayer = getPlayer(resp_data);
-                if (Configuration.Instance.AdvancedLogging == true)
+                if (currentPlayer != null)
                 {
+                    if (Configuration.Instance.AdvancedLogging == true)
+                    {
+                        if (!OnCooldown(currentPlayer))
+                        {
+                            Logger.Log("User " + currentPlayer.DisplayName + " completed advertisement.");
+                        }
+                        else
+                        {
+                            Logger.Log("User " + currentPlayer.DisplayName + " completed advertisement, but is on cooldown");
+                        }
+                    }
+
                     if (!OnCooldown(currentPlayer))
                     {
-                        Logger.Log("User " + currentPlayer.DisplayName + " completed advertisement.");
+                        GiveReward(currentPlayer);
+                        var CooldownTime = CurrentTime.Millis + (Configuration.Instance.CooldownTime * 60 * 1000);
+                        Cooldown.Add(currentPlayer.CSteamID, CooldownTime);
                     }
                     else
                     {
-                        Logger.Log("User " + currentPlayer.DisplayName + " completed advertisement, but is on cooldown");
+                        UnturnedChat.Say(currentPlayer, "You already received reward and now are on cooldown!");
                     }
-                }
 
-                if (!OnCooldown(currentPlayer))
-                {
-                    GiveReward(currentPlayer);
-                    var CooldownTime = CurrentTime.Millis + (Configuration.Instance.CooldownTime * 60 * 1000);
-                    Cooldown.Add(currentPlayer.CSteamID, CooldownTime);
                 }
                 else
                 {
-                    UnturnedChat.Say(currentPlayer, "You already received reward and now are on cooldown!");
+                    Logger.LogWarning("Player with CSteamID " + resp_data + " completed advertisement but is not on the server.");
                 }
             });
 
@@ -110,15 +118,7 @@ namespace MOTDgd
             {
                 if (Connected == true && !OnCooldown(player))
                 {
-                    if (Configuration.Instance.SimulateMinecraft == true)
-                    {
-                        UnturnedChat.Say(player, "For getting reward go to: " + ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Server_ID));
-                    }
-                    else
-                    {
-                        UnturnedChat.Say(player, "For getting reward go to: " + ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Instance.User_ID + "&gm=unturned&clt_user=" + player.CSteamID + "&srv_id=" + Server_ID));
-                    }
-                    
+                    UnturnedChat.Say(player, "For getting reward go to: " + ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Server_ID));                  
                 }
             };
 
@@ -185,7 +185,6 @@ namespace MOTDgd
                     Logger.LogError("Error giving items to player! Format of configuration is incorrect!");
                 }
             }
-
             UnturnedChat.Say(player, "You got your reward! Now you are on cooldown for " + Configuration.Instance.CooldownTime + " minutes.");
         }
 
