@@ -23,13 +23,17 @@ namespace MOTDgd
         public bool AdvancedLogging;
         public string GiveItems;
         public int CooldownTime;
+        public string bitlyName;
+        public string bitlyAPIKey;
 
         public void LoadDefaults()
         {
             User_ID = 0;
             AdvancedLogging = false;
-            GiveItems = "";
+            GiveItems = " ";
             CooldownTime = 15;
+            bitlyName = " ";
+            bitlyAPIKey = " ";
         }
 
     }
@@ -118,7 +122,14 @@ namespace MOTDgd
             {
                 if (Connected == true && !OnCooldown(player))
                 {
-                    UnturnedChat.Say(player, "For getting reward go to: " + ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Server_ID));                  
+                    var shorten = ShortenUrl("http://motdgd.com/motd/?user=" + Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Server_ID);
+                    if (shorten != "") {
+                        UnturnedChat.Say(player, "For getting reward go to: " + shorten);
+                    }
+                    else
+                    {
+                        UnturnedChat.Say(player, "There was error with shortening URL. Contact your server administrator.");
+                    }
                 }
             };
 
@@ -133,20 +144,42 @@ namespace MOTDgd
         //Converting URL to shorter vesion
         public static string ShortenUrl(string url) {
             string shortUrl = string.Empty;
+            string statusTxt = string.Empty;
 
             using (WebClient wb = new WebClient())
             {
                 string data = string.Format("http://api.bitly.com/v3/shorten/?login={0}&apiKey={1}&longUrl={2}&format={3}",
-                "linhycz",
-                "R_c3c1e8f0c9264a3ea072786226e37be5",
+                Main.Instance.Configuration.Instance.bitlyName,
+                Main.Instance.Configuration.Instance.bitlyAPIKey,
                 HttpUtility.UrlEncode(url),
                 "xml");
+
+                //http://api.bitly.com/v3/shorten/?login=linhycz&apiKey=R_c3c1e8f0c9264a3ea072786226e37be5&longUrl=http://www.google.com&format=xml
 
                 XmlDocument xmlDoc = new XmlDocument();
                 xmlDoc.LoadXml(wb.DownloadString(data));
 
+                statusTxt = xmlDoc.GetElementsByTagName("status_txt")[0].InnerText;
                 shortUrl = xmlDoc.GetElementsByTagName("url")[0].InnerText;
-                return shortUrl;
+                if (statusTxt == "INVALID_APIKEY" || statusTxt == "MISSING_ARG_ACCESS_TOKEN")
+                {
+                    Logger.LogError("Your bitly API key is INVALID");
+                    return "";
+                }
+                else if (statusTxt == "MISSING_ARG_LOGIN" || statusTxt == "INVALID_LOGIN")
+                {
+                    Logger.LogError("Your bitly username is INVALID");
+                    return "";
+                }
+                else if (statusTxt == "OK")
+                {
+                    return shortUrl;
+                }
+                else
+                {
+                    Logger.LogError("Received error message from bitly. Error message: " + statusTxt);
+                    return "";
+                }
             }
         }
 
@@ -161,28 +194,103 @@ namespace MOTDgd
         //Give Reward
         public void GiveReward (UnturnedPlayer player)
         {
-
             string[] itemList = Configuration.Instance.GiveItems.Split(';');
             foreach (string Item in itemList) {
-                if (!Item.ToLower().Contains("heal"))
+                if (!Item.ToLower().Contains("heal") && !Item.ToLower().Contains("hp") && !Item.ToLower().Contains("experience") && !Item.ToLower().Contains("xp") && !Item.ToLower().Contains("vehicle") && !Item.ToLower().Contains("v"))
                 {
                     //Give items
                     string[] details = Item.Split(' ');
-                    ushort id = Convert.ToUInt16(details[0]);
-                    byte count = Convert.ToByte(details[1]);
-                    player.GiveItem(id, count);
+                    if (details.Length == 2)
+                    {
+                        ushort id = 0;
+                        byte count = 0;
+                        bool checkID = ushort.TryParse(details[0], out id);
+                        bool checkCount = byte.TryParse(details[1], out count);
+                        if (checkID && checkCount)
+                        {
+                            player.GiveItem(id, count);
+                        }
+                        else
+                        {
+                            Logger.LogError("Error giving items to " + player.DisplayName + "! Error in " + Item);
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Error giving items ot " + player.DisplayName + "! Error in " + Item);
+                    }
                 }
-                else if (Item.ToLower().Contains("heal"))
+                else if (Item.ToLower().Contains("heal") || Item.ToLower().Contains("hp"))
                 {
                     //Heal (how much HP to heal)
                     string[] details = Item.Split(' ');
-                    byte amount;
-                    byte.TryParse(details[1], out amount);
-                    player.Heal(amount);
+                    if (details.Length == 2)
+                    {
+                        byte amount;
+                        bool checkAmount = byte.TryParse(details[1], out amount);
+                        if (checkAmount)
+                        {
+                            player.Heal(amount);
+                        }
+                        else
+                        {
+                            Logger.LogError("Error healing " + player.DisplayName + "! Error in " + Item);
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Error healing " + player.DisplayName + "! Error in " + Item);
+                    }
                 }
-                else
+                else if (Item.ToLower().Contains("experience") || Item.ToLower().Contains("xp"))
                 {
-                    Logger.LogError("Error giving items to player! Format of configuration is incorrect!");
+                    string[] details = Item.Split(' ');
+                    if (details.Length == 2)
+                    {
+                        uint experience;
+                        bool checkXP = uint.TryParse(details[1], out experience);
+                        if (checkXP)
+                        {
+                            player.Experience = player.Experience + experience;
+                        }
+                        else
+                        {
+                            Logger.LogError("Error giving xp to " + player.DisplayName + "! Error in " + Item);
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Error giving xp to " + player.DisplayName + "! Error in " + Item);
+                    }
+                }
+                else if (Item.ToLower().Contains("vehicle") || Item.ToLower().Contains("v"))
+                {
+                    string[] details = Item.Split(' ');
+                    if (details.Length == 2)
+                    {
+                        ushort vehicleID;
+                        bool checkID = ushort.TryParse(details[1], out vehicleID);
+                        if (checkID)
+                        {
+                            bool check = player.GiveVehicle(vehicleID);
+                            if (!check)
+                            {
+                                Logger.LogError("Error giving vehicle to " + player.DisplayName);
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogError("Error giving vehicle to " + player.DisplayName + "! Error in " + Item);
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Error giving vehicle to " + player.DisplayName + "! Error in " + Item);
+                    }
+                } 
+                else 
+                {
+                    Logger.LogError("Error giving items to " + player.DisplayName + "! Format of configuration is incorrect!");
                 }
             }
             UnturnedChat.Say(player, "You got your reward! Now you are on cooldown for " + Configuration.Instance.CooldownTime + " minutes.");

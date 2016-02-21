@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+
 namespace MOTDgd
 {
     class CommandAd : IRocketCommand
@@ -68,7 +69,15 @@ namespace MOTDgd
 
             if (!Main.OnCooldown(player) && Main.Connected == true)
             {
-                UnturnedChat.Say(player, "For getting reward go to: " + Main.ShortenUrl("http://motdgd.com/motd/?user=" + Main.Instance.Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Main.Server_ID));
+                var shorten = Main.ShortenUrl("http://motdgd.com/motd/?user=" + Main.Instance.Configuration.Instance.User_ID + "&gm=minecraft&clt_user=" + player.CSteamID + "&srv_id=" + Main.Server_ID);
+                if (shorten != "")
+                {
+                    UnturnedChat.Say(player, "For getting reward go to: " + shorten);
+                }
+                else
+                {
+                UnturnedChat.Say(player, "There was error with shortening URL. Contact your server administrator.");
+                }
             }
             else if (Main.OnCooldown(player))
             {
